@@ -64,9 +64,9 @@ export async function runQuickCheck(
     });
   }
 
-  // Fall back to Exa if Brave returned nothing
+  // Fall back to Exa if Brave returned nothing — use "fast" type for quick-check latency
   if (results.length === 0 && config.exaApiKey) {
-    results = await searchExa(query, config.exaApiKey, 5).catch((err) => {
+    results = await searchExa(query, config.exaApiKey, 5, "fast").catch((err) => {
       console.error("[exa] quick-check failed:", err.message);
       return [];
     });
