@@ -2,10 +2,13 @@ import type { SearchResult } from "./types.js";
 
 const EXA_API_BASE = "https://api.exa.ai/search";
 
+export type ExaSearchType = "auto" | "fast" | "instant" | "deep-lite" | "deep";
+
 export async function searchExa(
   query: string,
   apiKey: string,
-  count = 10
+  count = 10,
+  type: ExaSearchType = "auto"
 ): Promise<SearchResult[]> {
   const res = await fetch(EXA_API_BASE, {
     method: "POST",
@@ -16,9 +19,8 @@ export async function searchExa(
     body: JSON.stringify({
       query,
       numResults: count,
-      useAutoprompt: true,
-      type: "neural",
-      contents: { snippet: { maxCharacters: 300 } },
+      type,
+      contents: { highlights: true },
     }),
   });
 
@@ -30,10 +32,12 @@ export async function searchExa(
   const results: SearchResult[] = [];
 
   for (const item of data.results ?? []) {
+    // highlights is an array of relevant excerpts; join top 2 as the description
+    const description = item.highlights?.slice(0, 2).join(" ") ?? "";
     results.push({
       url: item.url,
       title: item.title ?? item.url,
-      description: item.snippet ?? "",
+      description,
       source: "exa",
     });
   }
@@ -45,6 +49,6 @@ interface ExaResponse {
   results: Array<{
     url: string;
     title?: string;
-    snippet?: string;
+    highlights?: string[];
   }>;
 }
