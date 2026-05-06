@@ -4,7 +4,8 @@ const EXA_API_BASE = "https://api.exa.ai/search";
 
 export async function searchExa(
   query: string,
-  apiKey: string
+  apiKey: string,
+  count = 10
 ): Promise<SearchResult[]> {
   const res = await fetch(EXA_API_BASE, {
     method: "POST",
@@ -14,7 +15,7 @@ export async function searchExa(
     },
     body: JSON.stringify({
       query,
-      numResults: 10,
+      numResults: count,
       useAutoprompt: true,
       type: "neural",
       contents: { snippet: { maxCharacters: 300 } },

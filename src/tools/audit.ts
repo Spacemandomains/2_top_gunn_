@@ -3,6 +3,8 @@ import { runAudit } from "../lib/audit.js";
 import { verifyStripeSession, buildPaymentRequired } from "../lib/payment.js";
 import type { AuditResult } from "../lib/types.js";
 
+export const AUDIT_PRICE_CENTS = 150; // $1.50
+
 export const AuditInputSchema = z.object({
   query: z.string().min(1).describe("Brand name, company, or product to audit"),
   paymentToken: z
@@ -18,18 +20,16 @@ export async function handleAuditTool(input: AuditInput): Promise<string> {
   const paymentUrl = process.env["STRIPE_PAYMENT_URL"] ?? "";
   const walletAddress = process.env["USDC_WALLET_ADDRESS"];
 
-  // Enforce payment gate
   if (!input.paymentToken) {
-    const req = buildPaymentRequired(paymentUrl, walletAddress);
-    return formatPaymentRequired(req);
+    return formatPaymentRequired(buildPaymentRequired(paymentUrl, "1.50", walletAddress));
   }
 
-  const isPaid = await verifyStripeSession(input.paymentToken, stripeSecretKey);
+  const isPaid = await verifyStripeSession(input.paymentToken, stripeSecretKey, AUDIT_PRICE_CENTS);
   if (!isPaid) {
     return [
-      "Payment token is invalid or the session has not been paid.",
+      "Payment token is invalid, unpaid, or was issued for a lower-priced tier.",
       "",
-      `Complete payment at: ${paymentUrl}`,
+      `Complete the $1.50 payment at: ${paymentUrl}`,
       "Then retry with the Stripe session ID as `paymentToken`.",
     ].join("\n");
   }
@@ -42,7 +42,7 @@ export async function handleAuditTool(input: AuditInput): Promise<string> {
   return formatAuditResult(result);
 }
 
-function formatPaymentRequired(req: ReturnType<typeof buildPaymentRequired>): string {
+export function formatPaymentRequired(req: ReturnType<typeof buildPaymentRequired>): string {
   return [
     "## Payment Required",
     "",

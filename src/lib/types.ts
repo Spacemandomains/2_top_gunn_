@@ -29,6 +29,15 @@ export interface LLMIndexStatus {
   estimatedReach: "High" | "Medium" | "Low" | "Unknown";
 }
 
+export interface QuickCheckResult {
+  query: string;
+  score: number;
+  label: "Strong" | "Moderate" | "Weak" | "Not Found";
+  topCitations: Citation[];
+  quickTips: string[];
+  checkedAt: string;
+}
+
 export interface PaymentRequired {
   error: "payment_required";
   message: string;

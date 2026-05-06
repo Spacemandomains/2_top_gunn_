@@ -1,7 +1,7 @@
 import { searchBrave } from "./brave.js";
 import { searchExa } from "./exa.js";
-import { scoreResults } from "./scorer.js";
-import type { AuditResult, SearchResult } from "./types.js";
+import { quickScoreResults, scoreResults } from "./scorer.js";
+import type { AuditResult, QuickCheckResult, SearchResult } from "./types.js";
 
 export interface AuditConfig {
   braveApiKey?: string;
@@ -42,6 +42,37 @@ export async function runAudit(
   const allResults = deduplicateByUrl(resultGroups.flat());
 
   return scoreResults(query, allResults);
+}
+
+// Quick check: single source, 5 results — used by the $0.05 geo_quick_check tool
+export async function runQuickCheck(
+  query: string,
+  config: AuditConfig
+): Promise<QuickCheckResult> {
+  if (!config.braveApiKey && !config.exaApiKey) {
+    throw new Error(
+      "At least one search API key is required: BRAVE_SEARCH_API_KEY or EXA_API_KEY"
+    );
+  }
+
+  let results: SearchResult[] = [];
+
+  if (config.braveApiKey) {
+    results = await searchBrave(query, config.braveApiKey, 5).catch((err) => {
+      console.error("[brave] quick-check failed:", err.message);
+      return [];
+    });
+  }
+
+  // Fall back to Exa if Brave returned nothing
+  if (results.length === 0 && config.exaApiKey) {
+    results = await searchExa(query, config.exaApiKey, 5).catch((err) => {
+      console.error("[exa] quick-check failed:", err.message);
+      return [];
+    });
+  }
+
+  return quickScoreResults(query, results);
 }
 
 function deduplicateByUrl(results: SearchResult[]): SearchResult[] {

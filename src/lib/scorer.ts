@@ -1,4 +1,4 @@
-import type { AuditResult, Citation, LLMIndexStatus, SearchResult } from "./types.js";
+import type { AuditResult, Citation, LLMIndexStatus, QuickCheckResult, SearchResult } from "./types.js";
 
 const SCORE_LABELS = [
   { min: 75, label: "Strong" as const },
@@ -87,6 +87,73 @@ function estimateReach(score: number, citations: Citation[]): LLMIndexStatus["es
   if (score >= 40 || hasHighAuth) return "Medium";
   if (score > 0) return "Low";
   return "Unknown";
+}
+
+export function quickScoreResults(query: string, results: SearchResult[]): QuickCheckResult {
+  const normalizedQuery = query.toLowerCase();
+  let rawScore = 0;
+  const citations: Citation[] = [];
+
+  for (let i = 0; i < results.length; i++) {
+    const r = results[i];
+    const text = `${r.title} ${r.description}`.toLowerCase();
+    const positionWeight = 1 - i * 0.07;
+    const domainWeight = isHighAuthority(r.url) ? 1.4 : 1.0;
+    const mentionWeight = countMentions(normalizedQuery, text) > 0 ? 1.0 : 0.2;
+    rawScore += 10 * positionWeight * domainWeight * mentionWeight;
+
+    citations.push({
+      url: r.url,
+      title: r.title,
+      snippet: r.description.slice(0, 150),
+      source: r.source,
+      position: i + 1,
+    });
+  }
+
+  const score = Math.min(100, Math.round(rawScore));
+  const label = SCORE_LABELS.find((s) => score >= s.min)!.label;
+
+  return {
+    query,
+    score,
+    label,
+    topCitations: citations.slice(0, 3),
+    quickTips: generateQuickTips(query, score, citations),
+    checkedAt: new Date().toISOString(),
+  };
+}
+
+function generateQuickTips(query: string, score: number, citations: Citation[]): string[] {
+  const citedDomains = new Set(
+    citations.map((c) => {
+      try { return new URL(c.url).hostname.replace(/^www\./, ""); } catch { return ""; }
+    })
+  );
+
+  if (score < 25) {
+    return [
+      `"${query}" has minimal LLM visibility. Start with a Wikipedia page and a Product Hunt listing.`,
+      "Run a full audit ($1.50) for a complete citation breakdown and prioritized GEO roadmap.",
+    ];
+  }
+  if (score < 50) {
+    const missing = !citedDomains.has("github.com") ? "GitHub" : !citedDomains.has("reddit.com") ? "Reddit" : "high-authority directories";
+    return [
+      `Moderate presence detected. Boost it by getting listed on ${missing} and Crunchbase.`,
+      "Run a full audit ($1.50) to see all citations and a complete recommendation set.",
+    ];
+  }
+  if (score < 75) {
+    return [
+      `Good visibility for "${query}". Add JSON-LD Organization schema to your site to reinforce it.`,
+      "Run a full audit ($1.50) to identify specific citation gaps and reach estimates.",
+    ];
+  }
+  return [
+    `Strong LLM visibility for "${query}". Keep profiles current and monitor monthly.`,
+    "Run a full audit ($1.50) for a detailed citation report and drift analysis.",
+  ];
 }
 
 function generateRecommendations(

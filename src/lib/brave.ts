@@ -4,11 +4,12 @@ const BRAVE_API_BASE = "https://api.search.brave.com/res/v1/web/search";
 
 export async function searchBrave(
   query: string,
-  apiKey: string
+  apiKey: string,
+  count = 10
 ): Promise<SearchResult[]> {
   const url = new URL(BRAVE_API_BASE);
   url.searchParams.set("q", query);
-  url.searchParams.set("count", "10");
+  url.searchParams.set("count", String(count));
   url.searchParams.set("result_filter", "web");
 
   const res = await fetch(url.toString(), {
